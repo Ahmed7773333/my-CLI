@@ -97,7 +97,7 @@ class __pascal__Model {
 ''',
 
   'data/datasources/remote/__snake___remote_data_source.dart': '''
-import '../models/__snake__model.dart';
+import '../../models/__snake__model.dart';
 
 // You would typically extend an abstract class:
 // abstract class __pascal__RemoteDataSource {
@@ -118,7 +118,7 @@ class __pascal__RemoteDataSource {
 ''',
 
   'data/datasources/local/__snake___local_data_source.dart': '''
-import '../models/__snake__model.dart';
+import '../../models/__snake__model.dart';
 
 // abstract class __pascal__LocalDataSource {
 //   Future<void> save(__pascal__Model model);

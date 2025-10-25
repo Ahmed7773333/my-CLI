@@ -151,8 +151,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'config/routes/app_router.dart';
 import 'config/theme/app_theme.dart';
 import 'core/di/injector.dart';
-import 'features/auth/presentation/bloc/auth_bloc.dart';
-import 'features/auth/presentation/pages/splash_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -171,9 +169,9 @@ class __pascal__App extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider(
-          create: (_) => injector<AuthBloc>()..add(CheckAuthStatusEvent()),
-        ),
+        // BlocProvider(
+        //   create: (_) => injector<AuthBloc>()..add(CheckAuthStatusEvent()),
+        // ),
         // Add other global BLoCs here
       ],
       child: MaterialApp(
@@ -184,7 +182,6 @@ class __pascal__App extends StatelessWidget {
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system, // Or control this with a BLoC
         onGenerateRoute: AppRouter.onGenerateRoute,
-        home: const SplashPage(),
       ),
     );
   }
@@ -198,9 +195,6 @@ class __pascal__App extends StatelessWidget {
   'lib/config/routes/app_router.dart': '''
 import 'package:flutter/material.dart';
 import 'custom_routes.dart';
-import '../../features/auth/presentation/pages/login_page.dart';
-import '../../features/auth/presentation/pages/splash_page.dart';
-import '../../features/home/presentation/pages/home_page.dart';
 
 class AppRoutes {
   static const String splash = '/';
@@ -211,12 +205,12 @@ class AppRoutes {
 class AppRouter {
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
-      case AppRoutes.splash:
-        return MaterialPageRoute(builder: (_) => const SplashPage());
-      case AppRoutes.login:
-        return RightRouting(const LoginPage());
-      case AppRoutes.home:
-        return RightRouting(const HomePage());
+      // case AppRoutes.splash:
+      //   return MaterialPageRoute(builder: (_) => const SplashPage());
+      // case AppRoutes.login:
+      //   return RightRouting(const LoginPage());
+      // case AppRoutes.home:
+      //   return RightRouting(const HomePage());
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(
@@ -342,7 +336,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 import '../network/api_consumer.dart';
 import '../network/dio_client.dart';
-import '../../features/auth/di/auth_injector.dart';
 
 final injector = GetIt.instance;
 
@@ -355,7 +348,7 @@ Future<void> setupInjector() async {
   injector.registerSingleton<ApiConsumer>(DioClient(injector<Dio>()));
 
   // Features
-  await initAuthInjector();
+  // await initAuthInjector();
   // await initHomeInjector();
   // ... add other feature injectors
 }
@@ -935,5 +928,4 @@ class ErrorDisplayWidget extends StatelessWidget {
   }
 }
 ''',
-
 };

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'create feature command.dart';
 import 'generate hive command.dart';
+import 'create clean arch project.dart';
 
 void main(List<String> args) {
   final parser = ArgParser();
@@ -19,15 +20,40 @@ void main(List<String> args) {
     exit(1);
   }
 
-  // CREATE FEATURE command
-  if (results.command?.name == 'create') {
-    runCreateFeature(results.command!.rest);
+  final command = results.command;
+  if (command == null) {
+    printUsage(parser);
+    exit(0);
+  }
+
+  final commandName = command.name;
+  final rest = command.rest;
+
+  if (commandName == 'create') {
+    if (rest.isEmpty) {
+      print('Error: Missing subcommand for "create".');
+      printUsage(parser);
+      exit(1);
+    }
+
+    final subCommand = rest[0];
+    if (subCommand == 'feature') {
+      // Pass the *full* rest list, as the original function expects it
+      runCreateFeature(rest);
+    } else if (subCommand == 'project') {
+      // Pass the *full* rest list, my new function will parse it
+      runCreateProject(rest);
+    } else {
+      print('Error: Unknown subcommand "$subCommand" for "create".');
+      printUsage(parser);
+      exit(1);
+    }
     return;
   }
 
-  // GENERATE commands
-  if (results.command?.name == 'generate') {
-    runGenerateHive(results.command!.rest);
+  if (commandName == 'generate') {
+    // The original runGenerateHive handles subcommands itself
+    runGenerateHive(rest);
     return;
   }
 
@@ -37,7 +63,15 @@ void main(List<String> args) {
 }
 
 void printUsage(ArgParser parser) {
-  print('Usage:');
-  print('  feature_cli create feature <feature_name>');
-  print('  feature_cli generate hive <path/to/model.dart>');
+  print('Usage: feature_cli <command> <subcommand> [options]');
+  print('');
+  print('Available commands:');
+  print('  create');
+  print('    feature <feature_name>    - Creates a new feature module.');
+  print('    project <project_name>    - Creates a new full Flutter project.');
+  print('');
+  print('  generate');
+  print(
+      '    hive <path/to/model.dart> - Generates Hive adapter and helper files.');
+  print('');
 }

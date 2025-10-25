@@ -25,6 +25,8 @@ void runCreateFeature(List<String> rest) {
   }
   stdout.writeln(
       '\n🎉 Feature "${r.pascalCase}" created successfully at: ${baseDir.path}');
+  stdout.writeln(
+      'Register your feature by calling init__pascal__Injector() in lib/core/di/injector.dart');
 }
 
 /// simple template renderer
@@ -38,6 +40,44 @@ String _render(String tpl, ReCase r) {
 
 // All templates are kept in this file, scoped to the 'create' command.
 const Map<String, String> templates = {
+  // ===========================
+  // 📂 DI
+  // ===========================
+
+  'di/__snake___injector.dart': '''
+import '../../../core/di/injector.dart';
+import '../data/datasources/local/__snake___local_data_source.dart';
+import '../data/datasources/remote/__snake___remote_data_source.dart';
+import '../data/repositories/__snake___repository_impl.dart';
+import '../domain/repositories/__snake___repository.dart';
+import '../domain/usecases/get___snake__.dart';
+import '../presentation/bloc/__snake___bloc.dart';
+
+Future<void> init__pascal__Injector() async {
+  // BLoC
+  injector.registerFactory(() => __pascal__Bloc(
+        get__pascal__: injector(),
+      ));
+
+  // UseCases
+  injector.registerLazySingleton(() => Get__pascal__UseCase(injector()));
+
+  // Repositories
+  injector.registerLazySingleton<__pascal__Repository>(() => __pascal__RepositoryImpl(
+        remote: injector(),
+        local: injector(),
+      ));
+
+  // DataSources
+  // Note: Registering as RemoteDataSourceImpl/LocalDataSourceImpl
+  // If they required dependencies (like ApiConsumer), they would be passed here.
+  injector.registerLazySingleton<__pascal__RemoteDataSource>(
+      () => __pascal__RemoteDataSource());
+  injector.registerLazySingleton<__pascal__LocalDataSource>(
+      () => __pascal__LocalDataSource());
+}
+''',
+
   // ===========================
   // 📂 DATA LAYER
   // ===========================
@@ -59,8 +99,18 @@ class __pascal__Model {
   'data/datasources/remote/__snake___remote_data_source.dart': '''
 import '../models/__snake__model.dart';
 
+// You would typically extend an abstract class:
+// abstract class __pascal__RemoteDataSource {
+//   Future<__pascal__Model> fetch();
+// }
+
 class __pascal__RemoteDataSource {
+  // final ApiConsumer apiConsumer;
+  // __pascal__RemoteDataSource({required this.apiConsumer});
+
   Future<__pascal__Model> fetch() async {
+    // final response = await apiConsumer.get('/__kebab__');
+    // return __pascal__Model.fromJson(response);
     await Future.delayed(const Duration(milliseconds: 300));
     return __pascal__Model.fake();
   }
@@ -70,7 +120,15 @@ class __pascal__RemoteDataSource {
   'data/datasources/local/__snake___local_data_source.dart': '''
 import '../models/__snake__model.dart';
 
+// abstract class __pascal__LocalDataSource {
+//   Future<void> save(__pascal__Model model);
+//   Future<__pascal__Model?> load();
+// }
+
 class __pascal__LocalDataSource {
+  // final FlutterSecureStorage storage;
+  // __pascal__LocalDataSource({required this.storage});
+  
   __pascal__Model? _cache;
 
   Future<void> save(__pascal__Model model) async {
@@ -85,9 +143,12 @@ class __pascal__LocalDataSource {
 
   'data/repositories/__snake___repository_impl.dart': '''
 import '../../domain/repositories/__snake___repository.dart';
-import '../datasources/__snake___remote_data_source.dart';
-import '../datasources/__snake___local_data_source.dart';
+import '../datasources/remote/__snake___remote_data_source.dart';
+import '../datasources/local/__snake___local_data_source.dart';
 import '../models/__snake__model.dart';
+// import 'package:dartz/dartz.dart';
+// import '../../../../core/error/failures.dart';
+// import '../../../../core/error/exceptions.dart';
 
 class __pascal__RepositoryImpl implements __pascal__Repository {
   final __pascal__RemoteDataSource remote;
@@ -100,6 +161,22 @@ class __pascal__RepositoryImpl implements __pascal__Repository {
 
   @override
   Future<__pascal__Model> get__pascal__() async {
+    // In a real app, you'd use dartz Either for error handling:
+    // Future<Either<Failure, __pascal__Model>> get__pascal__() async {
+    // try {
+    //   final cached = await local.load();
+    //   if (cached != null) return Right(cached);
+    //
+    //   final data = await remote.fetch();
+    //   await local.save(data);
+    //   return Right(data);
+    // } on ServerException catch (e) {
+    //   return Left(ServerFailure(e.message));
+    // } on CacheException catch (e) {
+    //   return Left(CacheFailure(e.message));
+    // }
+    // }
+    
     final cached = await local.load();
     if (cached != null) return cached;
 
@@ -115,30 +192,46 @@ class __pascal__RepositoryImpl implements __pascal__Repository {
   // ===========================
 
   'domain/entities/__snake__.dart': '''
-class __pascal__Entity {
+import 'package:equatable/equatable.dart';
+
+class __pascal__Entity extends Equatable {
   final String id;
   final String title;
 
-  __pascal__Entity({required this.id, required this.title});
+  const __pascal__Entity({required this.id, required this.title});
+  
+  @override
+  List<Object> get props => [id, title];
 }
 ''',
 
   'domain/repositories/__snake___repository.dart': '''
 import '../../data/models/__snake__model.dart';
+// import 'package:dartz/dartz.dart';
+// import '../../../../core/error/failures.dart';
 
 abstract class __pascal__Repository {
+  // Future<Either<Failure, __pascal__Model>> get__pascal__();
   Future<__pascal__Model> get__pascal__();
 }
 ''',
 
   'domain/usecases/get___snake__.dart': '''
 import '../repositories/__snake___repository.dart';
+// import 'package:dartz/dartz.dart';
+// import '../../../../core/error/failures.dart';
+// import '../entities/__snake__.dart';
 
 class Get__pascal__UseCase {
   final __pascal__Repository repository;
 
   Get__pascal__UseCase(this.repository);
 
+  // Future<Either<Failure, __pascal__Entity>> call() async {
+  //   // You would map from Model to Entity here
+  //   return await repository.get__pascal__();
+  // }
+  
   Future call() => repository.get__pascal__();
 }
 ''',
@@ -148,7 +241,13 @@ class Get__pascal__UseCase {
   // ===========================
 
   'presentation/bloc/__snake___event.dart': '''
-abstract class __pascal__Event {}
+import 'package:equatable/equatable.dart';
+
+abstract class __pascal__Event extends Equatable {
+  const __pascal__Event();
+  @override
+  List<Object> get props => [];
+}
 
 class Load__pascal__Event extends __pascal__Event {}
 ''',
@@ -162,23 +261,27 @@ class __pascal__State extends Equatable {
   const __pascal__State({
     this.status = __pascal__Status.initial,
     this.message = '',
+    // final __pascal__Entity? entity,
   });
 
   final __pascal__Status status;
   final String message;
+  // final __pascal__Entity? entity;
 
   __pascal__State copyWith({
     __pascal__Status? status,
     String? message,
+    // __pascal__Entity? entity,
   }) {
     return __pascal__State(
       status: status ?? this.status,
       message: message ?? this.message,
+      // entity: entity ?? this.entity,
     );
   }
 
   @override
-  List<Object> get props => [status, message];
+  List<Object> get props => [status, message]; // props..add(entity)
 }
 ''',
 
@@ -201,7 +304,15 @@ class __pascal__Bloc extends Bloc<__pascal__Event, __pascal__State> {
       Load__pascal__Event event, Emitter<__pascal__State> emit) async {
     emit(state.copyWith(status: __pascal__Status.loading));
     try {
-      await get__pascal__();
+      // final result = await get__pascal__();
+      // result.fold(
+      //   (failure) => emit(state.copyWith(
+      //       status: __pascal__Status.error, message: failure.message)),
+      //   (entity) => emit(state.copyWith(
+      //       status: __pascal__Status.loaded, entity: entity)),
+      // );
+      
+      await get__pascal__(); // simple version
       emit(state.copyWith(status: __pascal__Status.loaded));
     } catch (e) {
       emit(state.copyWith(status: __pascal__Status.error, message: e.toString()));
@@ -213,12 +324,27 @@ class __pascal__Bloc extends Bloc<__pascal__Event, __pascal__State> {
   'presentation/pages/__snake___page.dart': '''
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../di/__snake___injector.dart';
+import '../../../../core/di/injector.dart';
 import '../bloc/__snake___bloc.dart';
 import '../bloc/__snake___event.dart';
 import '../bloc/__snake___state.dart';
 
 class __pascal__Page extends StatelessWidget {
   const __pascal__Page({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // You can provide the BLoC locally
+    return BlocProvider(
+      create: (context) => injector<__pascal__Bloc>()..add(Load__pascal__Event()),
+      child: const __pascal__View(),
+    );
+  }
+}
+
+class __pascal__View extends StatelessWidget {
+  const __pascal__View({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -229,10 +355,6 @@ class __pascal__Page extends StatelessWidget {
           builder: (context, state) {
             switch (state.status) {
               case __pascal__Status.initial:
-                return ElevatedButton(
-                  onPressed: () => context.read<__pascal__Bloc>().add(Load__pascal__Event()),
-                  child: const Text('Load'),
-                );
               case __pascal__Status.loading:
                 return const CircularProgressIndicator();
               case __pascal__Status.loaded:
@@ -243,6 +365,10 @@ class __pascal__Page extends StatelessWidget {
           },
         ),
       ),
+       floatingActionButton: FloatingActionButton(
+        onPressed: () => context.read<__pascal__Bloc>().add(Load__pascal__Event()),
+        child: const Icon(Icons.refresh),
+       ),
     );
   }
 }

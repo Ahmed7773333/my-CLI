@@ -1,0 +1,27 @@
+{
+  "roots": [
+    "feature_cli"
+  ],
+  "packages": [
+    {
+      "name": "feature_cli",
+      "version": "0.1.0",
+      "dependencies": [
+        "args",
+        "recase"
+      ],
+      "devDependencies": []
+    },
+    {
+      "name": "args",
+      "version": "2.7.0",
+      "dependencies": []
+    },
+    {
+      "name": "recase",
+      "version": "4.1.0",
+      "dependencies": []
+    }
+  ],
+  "configVersion": 1
+}

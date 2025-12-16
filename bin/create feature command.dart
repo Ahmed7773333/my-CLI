@@ -1,6 +1,10 @@
 import 'dart:io';
 import 'package:recase/recase.dart';
 
+/// ======================
+/// Create feature command
+/// ======================
+
 /// Runs the 'create feature' command logic.
 void runCreateFeature(List<String> rest) {
   if (rest.length < 2 || rest[0] != 'feature') {
@@ -43,15 +47,16 @@ const Map<String, String> templates = {
   // ===========================
   // 📂 DI
   // ===========================
-
   'di/__snake___injector.dart': '''
 import '../../../core/di/injector.dart';
-import '../data/datasources/local/__snake___local_data_source.dart';
-import '../data/datasources/remote/__snake___remote_data_source.dart';
+import '../data/datasources/local/__snake___local_data_source_impl.dart';
+import '../data/datasources/remote/__snake___remote_data_source_impl.dart';
 import '../data/repositories/__snake___repository_impl.dart';
 import '../domain/repositories/__snake___repository.dart';
 import '../domain/usecases/get___snake__.dart';
 import '../presentation/bloc/__snake___bloc.dart';
+import '../../__snake__/domain/datasources/__snake___local_data_source.dart' as local_ds;
+import '../../__snake__/domain/datasources/__snake___remote_data_source.dart' as remote_ds;
 
 Future<void> init__pascal__Injector() async {
   // BLoC
@@ -69,19 +74,17 @@ Future<void> init__pascal__Injector() async {
       ));
 
   // DataSources
-  // Note: Registering as RemoteDataSourceImpl/LocalDataSourceImpl
-  // If they required dependencies (like ApiConsumer), they would be passed here.
-  injector.registerLazySingleton<__pascal__RemoteDataSource>(
-      () => __pascal__RemoteDataSource());
-  injector.registerLazySingleton<__pascal__LocalDataSource>(
-      () => __pascal__LocalDataSource());
+  // Register implementations for the interfaces
+  injector.registerLazySingleton<remote_ds.__pascal__RemoteDataSource>(
+      () => __pascal__RemoteDataSourceImpl());
+  injector.registerLazySingleton<local_ds.__pascal__LocalDataSource>(
+      () => __pascal__LocalDataSourceImpl());
 }
 ''',
 
   // ===========================
-  // 📂 DATA LAYER
+  // 📂 DATA LAYER - MODELS
   // ===========================
-
   'data/models/__snake__model.dart': '''
 // fake model for __pascal__
 class __pascal__Model {
@@ -96,18 +99,38 @@ class __pascal__Model {
 }
 ''',
 
-  'data/datasources/remote/__snake___remote_data_source.dart': '''
+  // ===========================
+  // 📂 DOMAIN - DATASOURCE INTERFACES
+  // ===========================
+  'domain/datasources/__snake___remote_data_source.dart': '''
+import '../../data/models/__snake__model.dart';
+
+abstract class __pascal__RemoteDataSource {
+  Future<__pascal__Model> fetch();
+}
+''',
+
+  'domain/datasources/__snake___local_data_source.dart': '''
+import '../../data/models/__snake__model.dart';
+
+abstract class __pascal__LocalDataSource {
+  Future<void> save(__pascal__Model model);
+  Future<__pascal__Model?> load();
+}
+''',
+
+  // ===========================
+  // 📂 DATA - DATASOURCE IMPLEMENTATIONS
+  // ===========================
+  'data/datasources/remote/__snake___remote_data_source_impl.dart': '''
+import '../../../domain/datasources/__snake___remote_data_source.dart';
 import '../../models/__snake__model.dart';
 
-// You would typically extend an abstract class:
-// abstract class __pascal__RemoteDataSource {
-//   Future<__pascal__Model> fetch();
-// }
-
-class __pascal__RemoteDataSource {
+class __pascal__RemoteDataSourceImpl implements __pascal__RemoteDataSource {
   // final ApiConsumer apiConsumer;
-  // __pascal__RemoteDataSource({required this.apiConsumer});
+  // __pascal__RemoteDataSourceImpl({required this.apiConsumer});
 
+  @override
   Future<__pascal__Model> fetch() async {
     // final response = await apiConsumer.get('/__kebab__');
     // return __pascal__Model.fromJson(response);
@@ -117,34 +140,35 @@ class __pascal__RemoteDataSource {
 }
 ''',
 
-  'data/datasources/local/__snake___local_data_source.dart': '''
+  'data/datasources/local/__snake___local_data_source_impl.dart': '''
+import '../../../domain/datasources/__snake___local_data_source.dart';
 import '../../models/__snake__model.dart';
 
-// abstract class __pascal__LocalDataSource {
-//   Future<void> save(__pascal__Model model);
-//   Future<__pascal__Model?> load();
-// }
-
-class __pascal__LocalDataSource {
+class __pascal__LocalDataSourceImpl implements __pascal__LocalDataSource {
   // final FlutterSecureStorage storage;
-  // __pascal__LocalDataSource({required this.storage});
+  // __pascal__LocalDataSourceImpl({required this.storage});
   
   __pascal__Model? _cache;
 
+  @override
   Future<void> save(__pascal__Model model) async {
     _cache = model;
   }
 
+  @override
   Future<__pascal__Model?> load() async {
     return _cache;
   }
 }
 ''',
 
+  // ===========================
+  // 📂 DATA - REPOSITORY (depends on domain interfaces)
+  // ===========================
   'data/repositories/__snake___repository_impl.dart': '''
 import '../../domain/repositories/__snake___repository.dart';
-import '../datasources/remote/__snake___remote_data_source.dart';
-import '../datasources/local/__snake___local_data_source.dart';
+import '../../domain/datasources/__snake___remote_data_source.dart';
+import '../../domain/datasources/__snake___local_data_source.dart';
 import '../models/__snake__model.dart';
 // import 'package:dartz/dartz.dart';
 // import '../../../../core/error/failures.dart';
@@ -161,22 +185,6 @@ class __pascal__RepositoryImpl implements __pascal__Repository {
 
   @override
   Future<__pascal__Model> get__pascal__() async {
-    // In a real app, you'd use dartz Either for error handling:
-    // Future<Either<Failure, __pascal__Model>> get__pascal__() async {
-    // try {
-    //   final cached = await local.load();
-    //   if (cached != null) return Right(cached);
-    //
-    //   final data = await remote.fetch();
-    //   await local.save(data);
-    //   return Right(data);
-    // } on ServerException catch (e) {
-    //   return Left(ServerFailure(e.message));
-    // } on CacheException catch (e) {
-    //   return Left(CacheFailure(e.message));
-    // }
-    // }
-    
     final cached = await local.load();
     if (cached != null) return cached;
 
@@ -188,9 +196,8 @@ class __pascal__RepositoryImpl implements __pascal__Repository {
 ''',
 
   // ===========================
-  // 📂 DOMAIN LAYER
+  // 📂 DOMAIN - ENTITIES / REPO / USECASE
   // ===========================
-
   'domain/entities/__snake__.dart': '''
 import 'package:equatable/equatable.dart';
 
@@ -227,19 +234,13 @@ class Get__pascal__UseCase {
 
   Get__pascal__UseCase(this.repository);
 
-  // Future<Either<Failure, __pascal__Entity>> call() async {
-  //   // You would map from Model to Entity here
-  //   return await repository.get__pascal__();
-  // }
-  
   Future call() => repository.get__pascal__();
 }
 ''',
 
   // ===========================
-  // 📂 PRESENTATION LAYER
+  // 📂 PRESENTATION - BLOC / STATE / EVENT
   // ===========================
-
   'presentation/bloc/__snake___event.dart': '''
 import 'package:equatable/equatable.dart';
 
@@ -304,14 +305,6 @@ class __pascal__Bloc extends Bloc<__pascal__Event, __pascal__State> {
       Load__pascal__Event event, Emitter<__pascal__State> emit) async {
     emit(state.copyWith(status: __pascal__Status.loading));
     try {
-      // final result = await get__pascal__();
-      // result.fold(
-      //   (failure) => emit(state.copyWith(
-      //       status: __pascal__Status.error, message: failure.message)),
-      //   (entity) => emit(state.copyWith(
-      //       status: __pascal__Status.loaded, entity: entity)),
-      // );
-      
       await get__pascal__(); // simple version
       emit(state.copyWith(status: __pascal__Status.loaded));
     } catch (e) {
@@ -321,10 +314,13 @@ class __pascal__Bloc extends Bloc<__pascal__Event, __pascal__State> {
 }
 ''',
 
-  'presentation/pages/__snake___page.dart': '''
+  // ===========================
+  // 📂 PRESENTATION - PAGES
+  // ===========================
+  'presentation/pages/__snake___page.dart': r'''
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../di/__snake___injector.dart';
+import '../../di/__snake___injector.dart';
 import '../../../../core/di/injector.dart';
 import '../bloc/__snake___bloc.dart';
 import '../bloc/__snake___event.dart';
@@ -375,10 +371,9 @@ class __pascal__View extends StatelessWidget {
 ''',
 
   // ===========================
-  // 📂 WIDGETS
+  // 📂 PRESENTATION - WIDGETS
   // ===========================
-
-  'presentation/widgets/__snake___widget.dart': '''
+  'presentation/widgets/__snake___widget.dart': r'''
 import 'package:flutter/material.dart';
 
 class Fake__pascal__Widget extends StatefulWidget {
@@ -405,6 +400,109 @@ class _Fake__pascal__WidgetState extends State<Fake__pascal__Widget> {
       ],
     );
   }
+}
+''',
+
+  // ===========================
+  // 📂 TESTS - UNIT / WIDGET / INTEGRATION
+  // ===========================
+  'test/features/__snake__/__snake___unit_test.dart': r'''
+// NOTE: Update 'package:your_app' to your package name if you prefer package imports.
+// This unit test demonstrates repository behavior using mock implementations.
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:your_app/features/__snake__/data/models/__snake__model.dart';
+import 'package:your_app/features/__snake__/data/repositories/__snake___repository_impl.dart';
+import 'package:your_app/features/__snake__/domain/datasources/__snake___remote_data_source.dart';
+import 'package:your_app/features/__snake__/domain/datasources/__snake___local_data_source.dart';
+
+class MockRemoteDS extends Mock implements __pascal__RemoteDataSource {}
+class MockLocalDS extends Mock implements __pascal__LocalDataSource {}
+
+void main() {
+  late __pascal__RepositoryImpl repository;
+  late MockRemoteDS mockRemote;
+  late MockLocalDS mockLocal;
+
+  setUp(() {
+    mockRemote = MockRemoteDS();
+    mockLocal = MockLocalDS();
+    repository = __pascal__RepositoryImpl(remote: mockRemote, local: mockLocal);
+  });
+
+  test('should return cached data if exists', () async {
+    final fakeModel = __pascal__Model.fake();
+    when(() => mockLocal.load()).thenAnswer((_) async => fakeModel);
+
+    final result = await repository.get__pascal__();
+
+    expect(result.id, fakeModel.id);
+    verifyNever(() => mockRemote.fetch());
+  });
+
+  test('should fetch from remote when cache is empty', () async {
+    final fakeModel = __pascal__Model.fake();
+    when(() => mockLocal.load()).thenAnswer((_) async => null);
+    when(() => mockRemote.fetch()).thenAnswer((_) async => fakeModel);
+    when(() => mockLocal.save(any())).thenAnswer((_) async {});
+
+    final result = await repository.get__pascal__();
+
+    expect(result.id, fakeModel.id);
+    verify(() => mockRemote.fetch()).called(1);
+    verify(() => mockLocal.save(any())).called(1);
+  });
+}
+''',
+
+  'test/features/__snake__/__snake___widget_test.dart': r'''
+// Widget test skeleton for the feature page.
+// NOTE: Update 'package:your_app' to your package name if you prefer package imports.
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:your_app/features/__snake__/presentation/pages/__snake___page.dart';
+import 'package:your_app/features/__snake__/presentation/bloc/__snake___bloc.dart';
+import 'package:your_app/core/di/injector.dart' as core_injector;
+
+void main() {
+  testWidgets('Shows loading and then loaded text', (tester) async {
+    // If you use dependency injection, make sure injector is configured in tests.
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BlocProvider(
+          create: (_) => core_injector.injector<__pascal__Bloc>(),
+          child: const __pascal__Page(),
+        ),
+      ),
+    );
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.text('Data Loaded ✅'), findsOneWidget);
+  });
+}
+''',
+
+  'test/features/__snake__/__snake___integration_test.dart': r'''
+// Integration test skeleton for the feature.
+// NOTE: Update imports and main app entry as needed.
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+import 'package:your_app/main.dart' as app;
+
+void main() {
+  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('Load feature end-to-end', (tester) async {
+    app.main();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Data Loaded ✅'), findsOneWidget);
+  });
 }
 ''',
 };

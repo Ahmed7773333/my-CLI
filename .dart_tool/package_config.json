@@ -20,9 +20,10 @@
       "languageVersion": "3.0"
     }
   ],
+  "generated": "2025-12-15T09:32:25.542275Z",
   "generator": "pub",
-  "generatorVersion": "3.9.2",
+  "generatorVersion": "3.7.2",
   "flutterRoot": "file:///Users/a1/development/flutter",
-  "flutterVersion": "3.35.3",
+  "flutterVersion": "3.29.3",
   "pubCache": "file:///Users/a1/.pub-cache"
 }

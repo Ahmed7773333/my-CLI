@@ -5,6 +5,7 @@ import 'package:args/args.dart';
 import 'create feature command.dart';
 import 'generate hive command.dart';
 import 'create clean arch project.dart';
+import 'create_riverpod_feature_command.dart';
 
 void main(List<String> args) {
   final parser = ArgParser();
@@ -43,6 +44,9 @@ void main(List<String> args) {
     } else if (subCommand == 'project') {
       // Pass the *full* rest list, my new function will parse it
       runCreateProject(rest);
+    }
+    if (subCommand == 'feature_riverpod') {
+      runCreateFeatureRiverpod(rest);
     } else {
       print('Error: Unknown subcommand "$subCommand" for "create".');
       printUsage(parser);

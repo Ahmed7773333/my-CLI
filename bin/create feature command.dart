@@ -5,6 +5,25 @@ import 'package:recase/recase.dart';
 /// Create feature command
 /// ======================
 
+/// Reads the package name from pubspec.yaml in the current directory.
+String _getPackageName() {
+  final pubspec = File('pubspec.yaml');
+  if (!pubspec.existsSync()) {
+    stdout.writeln(
+        '⚠️  pubspec.yaml not found. Using "your_app" as package name.');
+    return 'your_app';
+  }
+  final content = pubspec.readAsStringSync();
+  final nameMatch =
+      RegExp(r'^name:\s*([\w_]+)', multiLine: true).firstMatch(content);
+  if (nameMatch != null) {
+    return nameMatch.group(1)!;
+  }
+  stdout.writeln(
+      '⚠️  Could not parse package name from pubspec.yaml. Using "your_app".');
+  return 'your_app';
+}
+
 /// Runs the 'create feature' command logic.
 void runCreateFeature(List<String> rest) {
   if (rest.length < 2 || rest[0] != 'feature') {
@@ -18,7 +37,8 @@ void runCreateFeature(List<String> rest) {
     stdout.writeln('⚠️  Feature already exists at ${baseDir.path}');
     exit(1);
   }
-  for (final entry in templates.entries) {
+  // Create feature files inside lib/features/__snake__/
+  for (final entry in featureTemplates.entries) {
     final relPath = entry.key;
     final contentTpl = entry.value;
     final finalPath = relPath.replaceAll('__snake__', r.snakeCase);
@@ -27,23 +47,38 @@ void runCreateFeature(List<String> rest) {
     outFile.writeAsStringSync(_render(contentTpl, r));
     stdout.writeln('✅ Created: ${outFile.path}');
   }
+  // Get the package name from pubspec.yaml
+  final packageName = _getPackageName();
+  // Create test files in main test folder (test/features/__snake__/)
+  final testDir = Directory('test/features/${r.snakeCase}');
+  for (final entry in testTemplates.entries) {
+    final relPath = entry.key;
+    final contentTpl = entry.value;
+    final finalPath = relPath.replaceAll('__snake__', r.snakeCase);
+    final outFile = File('${testDir.path}/$finalPath');
+    outFile.createSync(recursive: true);
+    outFile.writeAsStringSync(_render(contentTpl, r, packageName: packageName));
+    stdout.writeln('✅ Created: ${outFile.path}');
+  }
   stdout.writeln(
       '\n🎉 Feature "${r.pascalCase}" created successfully at: ${baseDir.path}');
+  stdout.writeln('📋 Tests created at: ${testDir.path}');
   stdout.writeln(
       'Register your feature by calling init__pascal__Injector() in lib/core/di/injector.dart');
 }
 
 /// simple template renderer
-String _render(String tpl, ReCase r) {
+String _render(String tpl, ReCase r, {String packageName = 'your_app'}) {
   return tpl
       .replaceAll('__pascal__', r.pascalCase)
       .replaceAll('__snake__', r.snakeCase)
       .replaceAll('__camel__', r.camelCase)
-      .replaceAll('__kebab__', r.paramCase);
+      .replaceAll('__kebab__', r.paramCase)
+      .replaceAll('__package__', packageName);
 }
 
-// All templates are kept in this file, scoped to the 'create' command.
-const Map<String, String> templates = {
+// Feature templates - created inside lib/features/__snake__/
+const Map<String, String> featureTemplates = {
   // ===========================
   // 📂 DI
   // ===========================
@@ -402,20 +437,22 @@ class _Fake__pascal__WidgetState extends State<Fake__pascal__Widget> {
   }
 }
 ''',
+};
 
+// Test templates - created in main test folder (test/features/__snake__/)
+const Map<String, String> testTemplates = {
   // ===========================
   // 📂 TESTS - UNIT / WIDGET / INTEGRATION
   // ===========================
-  'test/features/__snake__/__snake___unit_test.dart': r'''
-// NOTE: Update 'package:your_app' to your package name if you prefer package imports.
+  '__snake___unit_test.dart': r'''
 // This unit test demonstrates repository behavior using mock implementations.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:your_app/features/__snake__/data/models/__snake__model.dart';
-import 'package:your_app/features/__snake__/data/repositories/__snake___repository_impl.dart';
-import 'package:your_app/features/__snake__/domain/datasources/__snake___remote_data_source.dart';
-import 'package:your_app/features/__snake__/domain/datasources/__snake___local_data_source.dart';
+import 'package:__package__/features/__snake__/data/models/__snake__model.dart';
+import 'package:__package__/features/__snake__/data/repositories/__snake___repository_impl.dart';
+import 'package:__package__/features/__snake__/domain/datasources/__snake___remote_data_source.dart';
+import 'package:__package__/features/__snake__/domain/datasources/__snake___local_data_source.dart';
 
 class MockRemoteDS extends Mock implements __pascal__RemoteDataSource {}
 class MockLocalDS extends Mock implements __pascal__LocalDataSource {}
@@ -456,16 +493,15 @@ void main() {
 }
 ''',
 
-  'test/features/__snake__/__snake___widget_test.dart': r'''
+  '__snake___widget_test.dart': r'''
 // Widget test skeleton for the feature page.
-// NOTE: Update 'package:your_app' to your package name if you prefer package imports.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:your_app/features/__snake__/presentation/pages/__snake___page.dart';
-import 'package:your_app/features/__snake__/presentation/bloc/__snake___bloc.dart';
-import 'package:your_app/core/di/injector.dart' as core_injector;
+import 'package:__package__/features/__snake__/presentation/pages/__snake___page.dart';
+import 'package:__package__/features/__snake__/presentation/bloc/__snake___bloc.dart';
+import 'package:__package__/core/di/injector.dart' as core_injector;
 
 void main() {
   testWidgets('Shows loading and then loaded text', (tester) async {
@@ -486,13 +522,12 @@ void main() {
 }
 ''',
 
-  'test/features/__snake__/__snake___integration_test.dart': r'''
+  '__snake___integration_test.dart': r'''
 // Integration test skeleton for the feature.
-// NOTE: Update imports and main app entry as needed.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:your_app/main.dart' as app;
+import 'package:__package__/main.dart' as app;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();

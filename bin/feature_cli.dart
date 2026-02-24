@@ -6,6 +6,7 @@ import 'create feature command.dart';
 import 'generate hive command.dart';
 import 'create clean arch project.dart';
 import 'create_riverpod_feature_command.dart';
+import 'create lib command.dart';
 
 void main(List<String> args) {
   final parser = ArgParser();
@@ -44,8 +45,10 @@ void main(List<String> args) {
     } else if (subCommand == 'project') {
       // Pass the *full* rest list, my new function will parse it
       runCreateProject(rest);
-    }
-    if (subCommand == 'feature_riverpod') {
+    } else if (subCommand == 'lib') {
+      // Creates only the lib folder structure
+      runCreateLib(rest);
+    } else if (subCommand == 'feature_riverpod') {
       runCreateFeatureRiverpod(rest);
     } else {
       print('Error: Unknown subcommand "$subCommand" for "create".');
@@ -73,6 +76,7 @@ void printUsage(ArgParser parser) {
   print('  create');
   print('    feature <feature_name>    - Creates a new feature module.');
   print('    project <project_name>    - Creates a new full Flutter project.');
+  print('    lib <app_name>            - Creates only the lib folder structure.');
   print('');
   print('  generate');
   print(

@@ -5,8 +5,9 @@ environment:
   sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
-  recase: ^4.0.0
+  recase: ^4.1.0
   args: ^2.4.0
+  
 
 executables:
   feature_cli: feature_cli

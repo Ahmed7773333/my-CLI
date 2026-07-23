@@ -66,14 +66,22 @@ output-localization-file: app_localizations.dart
   'lib/main.dart': '''
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:__snake__/features/chat/presentation/bloc/chat_bloc.dart';
+import 'package:__snake__/features/homelayout/presentation/bloc/homelayout_bloc.dart';
+import 'package:__snake__/features/profile/presentation/bloc/profile_bloc.dart';
 import 'config/routes/app_router.dart';
 import 'config/theme/app_theme.dart';
 import 'core/di/injector.dart';
+import 'core/local/user_hive_helper.dart';
 import 'core/utils/bloc_observer.dart';
+import 'core/utils/screen_util_like.dart';
+import 'features/auth/presentation/bloc/auth_bloc.dart';
+import 'features/booking/presentation/bloc/booking_bloc.dart';
+import 'l10n/app_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  //Bloc.observer = AppBlocObserver();
+  Bloc.observer = AppBlocObserver();
   await UserHiveHelper.init(); // Initialize Hive and default user
   // Initialize dependencies
   await setupInjector();
@@ -82,32 +90,50 @@ void main() async {
 
 class __pascal__App extends StatelessWidget {
   // Static navigator key
-  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-  
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
   const __pascal__App({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        // BlocProvider(
-        //   create: (_) => injector<AuthBloc>()..add(CheckAuthStatusEvent()),
-        // ),
+        BlocProvider(create: (_) => injector<AuthBloc>()),
+        BlocProvider(create: (_) => injector<HomelayoutBloc>()),
+        BlocProvider(create: (_) => injector<ProfileBloc>()),
+        BlocProvider(create: (_) => injector<BookingBloc>()),
+        BlocProvider(create: (_) => injector<ChatBloc>()),
         // Add other global BLoCs here
       ],
-      child: MaterialApp(
-        navigatorKey: __pascal__App.navigatorKey, // Assign the key
-        title: '__pascal__',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system, // Or control this with a BLoC
-        onGenerateRoute: AppRouter.onGenerateRoute,
-        builder: (context, child) {
-          if (child != null) {
+      child: ValueListenableBuilder(
+        valueListenable: UserHiveHelper.getBoxListenable(),
+        builder: (context, box, child) {
+          final user = UserHiveHelper.getUser();
+          final locale = user?.language ?? 'ar';
+
+          return SafeArea(
+            top: false,
+            child: MaterialApp(
+              navigatorKey: __pascal__App.navigatorKey, // Assign the key
+              title: '__pascal__',
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.lightTheme,
+              darkTheme: AppTheme.darkTheme,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              initialRoute: AppRoutes.splash,
+              locale: Locale(locale),
+              themeMode: ThemeMode.light, // Or control this with a BLoC
+              onGenerateRoute: AppRouter.onGenerateRoute,
+              builder: (context, child) {
+                if (child != null) {
                   ScreenUtil.init(context: context);
                 }
-          return child!;
+                return child!;
+              },
+            ),
+          );
         },
       ),
     );
@@ -352,6 +378,8 @@ import '../utils/flutter_secure_storage_helper.dart';
 import 'api_consumer.dart';
 import '../error/exceptions.dart';
 import '../constants/app_constants.dart';
+import '../utils/snackbar_helper.dart';
+import '../local/user_hive_helper.dart';
 
 class DioClient implements ApiConsumer {
   final Dio dio;
@@ -365,6 +393,7 @@ class DioClient implements ApiConsumer {
       ..headers = {
         'accept': 'application/json',
         'content-type': 'application/json',
+        'app-lang': UserHiveHelper.getUser()?.language ?? 'en',
       };
 
     // --- ADVANCED LOGGING & AUTH INTERCEPTOR ---
@@ -379,7 +408,7 @@ class DioClient implements ApiConsumer {
 
           log('🚀 [REQUEST] [\${options.method}] URL: \${options.uri}');
           if (options.data != null) {
-            if (options.data is Future<FormData>) {
+            if (options.data is Future<FormData> || options.data is FormData) {
               final formData = await options.data as FormData;
               final fields = formData.fields
                   .map((e) => '\${e.key}: \${e.value}')
@@ -405,6 +434,18 @@ class DioClient implements ApiConsumer {
             '✅ [RESPONSE] [\${response.statusCode}] FROM: \${response.requestOptions.path}',
           );
           log('📄 [DATA]: \${response.data}');
+
+          // Show global success snackbar if a valid string 'message' is present
+          if (response.data is Map && response.data['message'] != null) {
+            final message = response.data['message'];
+            if (message is String && message.isNotEmpty) {
+              final context = __pascal__App.navigatorKey.currentContext;
+              if (context != null && response.requestOptions.method != 'GET') {
+                SnackbarHelper.showSuccess(context, message: message);
+              }
+            }
+          }
+
           return handler.next(response);
         },
         onError: (DioException e, handler) {
@@ -416,6 +457,31 @@ class DioClient implements ApiConsumer {
             log('📥 ERROR DATA: \${e.response?.data}');
           }
 
+          final context = __pascal__App.navigatorKey.currentContext;
+          if (context != null) {
+            if (e.type == DioExceptionType.badResponse) {
+              final statusCode = e.response?.statusCode;
+              final String errorMessage = e.response?.data is Map
+                  ? (e.response?.data['message'] ??
+                        'Server error (\$statusCode)')
+                  : 'Server error (\$statusCode)';
+              SnackbarHelper.showError(context, message: errorMessage);
+            } else if (e.type == DioExceptionType.connectionTimeout ||
+                e.type == DioExceptionType.receiveTimeout ||
+                e.type == DioExceptionType.sendTimeout ||
+                e.type == DioExceptionType.connectionError) {
+              SnackbarHelper.showError(
+                context,
+                message: 'Network error, please check your connection.',
+              );
+            } else {
+              SnackbarHelper.showError(
+                context,
+                message: e.message ?? 'An unknown error occurred.',
+              );
+            }
+          }
+
           if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
             log(
               '🚫 [AUTH] 401 Unauthorized - Consider triggering logout here.',
@@ -424,6 +490,10 @@ class DioClient implements ApiConsumer {
 
             if (context != null) {
               final String location = context.currentRouteName.toString();
+              final authRoutes = [
+                AppRoutes.login,
+                AppRoutes.home, // wait, should authRoutes contain home? Normally not, let's keep it general
+              ];
 
               if (location != AppRoutes.login) {
                 log('🚀 Redirecting to Login from \$location');
@@ -452,9 +522,9 @@ class DioClient implements ApiConsumer {
   }
 
   @override
-  Future<dynamic> post(String path, {dynamic data, Map<String, dynamic>? queryParameters}) async {
+  Future<dynamic> post(String path, {dynamic data}) async {
     try {
-      final response = await dio.post(path, data: data, queryParameters: queryParameters);
+      final response = await dio.post(path, data: data);
       return response.data;
     } on DioException catch (e) {
       _handleDioError(e);
@@ -462,9 +532,9 @@ class DioClient implements ApiConsumer {
   }
 
   @override
-  Future<dynamic> put(String path, {dynamic data, Map<String, dynamic>? queryParameters}) async {
+  Future<dynamic> put(String path, {dynamic data}) async {
     try {
-      final response = await dio.put(path, data: data, queryParameters: queryParameters);
+      final response = await dio.put(path, data: data);
       return response.data;
     } on DioException catch (e) {
       _handleDioError(e);
@@ -472,9 +542,9 @@ class DioClient implements ApiConsumer {
   }
 
   @override
-  Future<dynamic> delete(String path, {dynamic data, Map<String, dynamic>? queryParameters}) async {
+  Future<dynamic> delete(String path, {dynamic data}) async {
     try {
-      final response = await dio.delete(path, data: data, queryParameters: queryParameters);
+      final response = await dio.delete(path, data: data);
       return response.data;
     } on DioException catch (e) {
       _handleDioError(e);
@@ -482,9 +552,9 @@ class DioClient implements ApiConsumer {
   }
 
   @override
-  Future<dynamic> patch(String path, {dynamic data, Map<String, dynamic>? queryParameters}) async {
+  Future<dynamic> patch(String path, {dynamic data}) async {
     try {
-      final response = await dio.patch(path, data: data, queryParameters: queryParameters);
+      final response = await dio.patch(path, data: data);
       return response.data;
     } on DioException catch (e) {
       _handleDioError(e);
@@ -502,8 +572,11 @@ class DioClient implements ApiConsumer {
     }
 
     if (e.type == DioExceptionType.badResponse) {
-      final message = e.response?.data?['message'] ?? 'Server error';
-      throw ServerException(message: message);
+      final statusCode = e.response?.statusCode;
+      final message = e.response?.data is Map
+          ? (e.response?.data['message'] ?? 'Server error')
+          : 'Server error';
+      throw ServerException(message: message, statusCode: statusCode);
     }
 
     throw ServerException(message: e.message ?? 'An unknown error occurred.');
@@ -1067,8 +1140,9 @@ class UserDataAdapter extends TypeAdapter<UserData> {
   'lib/core/local/user_hive_helper.dart': '''
 import 'dart:developer';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'user_data.dart';
@@ -1175,6 +1249,11 @@ class UserHiveHelper {
   /// Deletes all boxes (for testing/logout)
   static void deleteAllBoxes() {
     Hive.deleteBoxFromDisk(_userBoxName);
+  }
+
+  /// Get listenable box for UI bindings
+  static ValueListenable<Box<UserData>> getBoxListenable() {
+    return Hive.box<UserData>(_userBoxName).listenable();
   }
 }
 ''',
@@ -1422,6 +1501,102 @@ class FlutterSecureStorageHelper {
 }
 ''',
 
+  'lib/core/utils/snackbar_helper.dart': '''
+import 'package:flutter/material.dart';
+import 'screen_util_like.dart';
+import '../../main.dart'; // To access __pascal__App.navigatorKey
+
+class SnackbarHelper {
+  static void showSuccess(BuildContext? context, {required String message}) {
+    final ctx = context ?? __pascal__App.navigatorKey.currentContext;
+    if (ctx == null) return;
+
+    _showCustomSnackbar(
+      context: ctx,
+      message: message,
+      backgroundColor: Colors.green.shade600,
+      icon: Icons.check_circle_outline,
+    );
+  }
+
+  static void showError(BuildContext? context, {required String message}) {
+    final ctx = context ?? __pascal__App.navigatorKey.currentContext;
+    if (ctx == null) return;
+
+    _showCustomSnackbar(
+      context: ctx,
+      message: message,
+      backgroundColor: Colors.red.shade600,
+      icon: Icons.error_outline,
+    );
+  }
+
+  static void showInfo(BuildContext? context, {required String message}) {
+    final ctx = context ?? __pascal__App.navigatorKey.currentContext;
+    if (ctx == null) return;
+
+    _showCustomSnackbar(
+      context: ctx,
+      message: message,
+      backgroundColor: Colors.blue.shade600,
+      icon: Icons.info_outline,
+    );
+  }
+
+  static void _showCustomSnackbar({
+    required BuildContext context,
+    required String message,
+    required Color backgroundColor,
+    required IconData icon,
+  }) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    final snackBar = SnackBar(
+      elevation: 0,
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: Colors.transparent,
+      content: Container(
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(12.r),
+          boxShadow: [
+            BoxShadow(
+              color: backgroundColor.withValues(alpha: 0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 24.r),
+            12.hor,
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      margin: EdgeInsets.only(
+        bottom: 24.h,
+        left: 20.w,
+        right: 20.w,
+      ),
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
+  }
+}
+''',
+
   'lib/core/utils/screen_util_like.dart': r'''
 // ignore_for_file: deprecated_member_use
 
@@ -1579,6 +1754,37 @@ class LoadingWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Center(
       child: CircularProgressIndicator(),
+    );
+  }
+}
+''',
+
+  'lib/shared/widgets/app_refresh_indicator.dart': '''
+import 'package:flutter/material.dart';
+import 'package:__snake__/core/utils/extensions/context_extensions.dart';
+
+class AppRefreshIndicator extends StatelessWidget {
+  final Widget child;
+  final RefreshCallback onRefresh;
+  final Color? color;
+  final Color? backgroundColor;
+
+  const AppRefreshIndicator({
+    super.key,
+    required this.child,
+    required this.onRefresh,
+    this.color,
+    this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      color: color ?? context.colors.primary,
+      backgroundColor: backgroundColor ?? Colors.white,
+      strokeWidth: 2.5,
+      child: child,
     );
   }
 }

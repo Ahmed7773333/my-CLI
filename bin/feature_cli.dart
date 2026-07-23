@@ -8,7 +8,7 @@ import 'create clean arch project.dart';
 import 'create_riverpod_feature_command.dart';
 import 'create lib command.dart';
 
-void main(List<String> args) {
+void main(List<String> args) async {
   final parser = ArgParser();
   parser.addCommand('create');
   parser.addCommand('generate');
@@ -44,7 +44,7 @@ void main(List<String> args) {
       runCreateFeature(rest);
     } else if (subCommand == 'project') {
       // Pass the *full* rest list, my new function will parse it
-      runCreateProject(rest);
+      await runCreateProject(rest);
     } else if (subCommand == 'lib') {
       // Creates only the lib folder structure
       runCreateLib(rest);

@@ -95,6 +95,7 @@ import '../../config/routes/app_router.dart';
 import '../../main.dart';
 import '../utils/extensions/context_extensions.dart';
 import '../utils/flutter_secure_storage_helper.dart';
+import '../utils/pretty_logger.dart';
 import 'api_consumer.dart';
 import '../error/exceptions.dart';
 import '../constants/app_constants.dart';
@@ -122,37 +123,25 @@ class DioClient implements ApiConsumer {
           final token = await FlutterSecureStorageHelper.getToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
-            log('🚀 [AUTH] Bearer $token');
           }
 
-          log('🚀 [REQUEST] [${options.method}] URL: ${options.uri}');
-          if (options.data != null) {
-            if (options.data is Future<FormData> || options.data is FormData) {
-              final formData = await options.data as FormData;
-              final fields = formData.fields
-                  .map((e) => '${e.key}: ${e.value}')
-                  .toList();
-              final files = formData.files
-                  .map((e) => '${e.key}: ${e.value.filename}')
-                  .toList();
-
-              log('📦 [FORM DATA FIELDS]: $fields');
-              log('📂 [FORM DATA FILES]: $files');
-            } else {
-              log('📦 [BODY]: ${options.data}');
-            }
-          }
-          if (options.queryParameters.isNotEmpty) {
-            log('❓ [QUERY PARAMS]: ${options.queryParameters}');
-          }
+          PrettyLogger.request(
+            method: options.method,
+            uri: options.uri,
+            token: token,
+            headers: options.headers,
+            queryParams: options.queryParameters,
+            data: options.data,
+          );
 
           return handler.next(options);
         },
         onResponse: (response, handler) {
-          log(
-            '✅ [RESPONSE] [${response.statusCode}] FROM: ${response.requestOptions.path}',
+          PrettyLogger.response(
+            statusCode: response.statusCode,
+            path: response.requestOptions.path,
+            data: response.data,
           );
-          log('📄 [DATA]: ${response.data}');
 
           // Show global success snackbar if a valid string 'message' is present
           if (response.data is Map && response.data['message'] != null) {
@@ -170,13 +159,13 @@ class DioClient implements ApiConsumer {
           return handler.next(response);
         },
         onError: (DioException e, handler) {
-          log('❌ [ERROR] [${e.response?.statusCode ?? 'NO STATUS'}]');
-          log('🔗 PATH: ${e.requestOptions.path}');
-          log('⚠️ TYPE: ${e.type}');
-          log('💬 MESSAGE: ${e.message}');
-          if (e.response?.data != null) {
-            log('📥 ERROR DATA: ${e.response?.data}');
-          }
+          PrettyLogger.error(
+            statusCode: e.response?.statusCode,
+            path: e.requestOptions.path,
+            type: e.type.name,
+            message: e.message ?? '',
+            errorData: e.response?.data,
+          );
 
           final context = Bel3lmApp.navigatorKey.currentContext;
           if (context != null) {
@@ -251,9 +240,17 @@ class DioClient implements ApiConsumer {
   }
 
   @override
-  Future<dynamic> post(String path, {dynamic data}) async {
+  Future<dynamic> post(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
-      final response = await dio.post(path, data: data);
+      final response = await dio.post(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+      );
       return response.data;
     } on DioException catch (e) {
       _handleDioError(e);
@@ -261,9 +258,17 @@ class DioClient implements ApiConsumer {
   }
 
   @override
-  Future<dynamic> put(String path, {dynamic data}) async {
+  Future<dynamic> put(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
-      final response = await dio.put(path, data: data);
+      final response = await dio.put(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+      );
       return response.data;
     } on DioException catch (e) {
       _handleDioError(e);
@@ -271,9 +276,17 @@ class DioClient implements ApiConsumer {
   }
 
   @override
-  Future<dynamic> delete(String path, {dynamic data}) async {
+  Future<dynamic> delete(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
-      final response = await dio.delete(path, data: data);
+      final response = await dio.delete(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+      );
       return response.data;
     } on DioException catch (e) {
       _handleDioError(e);
@@ -281,9 +294,17 @@ class DioClient implements ApiConsumer {
   }
 
   @override
-  Future<dynamic> patch(String path, {dynamic data}) async {
+  Future<dynamic> patch(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
-      final response = await dio.patch(path, data: data);
+      final response = await dio.patch(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+      );
       return response.data;
     } on DioException catch (e) {
       _handleDioError(e);

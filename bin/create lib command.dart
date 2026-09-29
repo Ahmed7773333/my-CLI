@@ -315,7 +315,11 @@ class AppConstants {
   'lib/core/error/exceptions.dart': '''
 class ServerException implements Exception {
   final String message;
-  ServerException({this.message = 'An unknown server error occurred.'});
+  final int? statusCode;
+  ServerException({
+    this.message = 'An unknown server error occurred.',
+    this.statusCode,
+  });
 }
 
 class CacheException implements Exception {
@@ -375,6 +379,7 @@ import '../../config/routes/app_router.dart';
 import '../../main.dart';
 import '../utils/extensions/context_extensions.dart';
 import '../utils/flutter_secure_storage_helper.dart';
+import '../utils/pretty_logger.dart';
 import 'api_consumer.dart';
 import '../error/exceptions.dart';
 import '../constants/app_constants.dart';
@@ -403,37 +408,25 @@ class DioClient implements ApiConsumer {
           final token = await FlutterSecureStorageHelper.getToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer \$token';
-            log('🚀 [AUTH] Bearer \$token');
           }
 
-          log('🚀 [REQUEST] [\${options.method}] URL: \${options.uri}');
-          if (options.data != null) {
-            if (options.data is Future<FormData> || options.data is FormData) {
-              final formData = await options.data as FormData;
-              final fields = formData.fields
-                  .map((e) => '\${e.key}: \${e.value}')
-                  .toList();
-              final files = formData.files
-                  .map((e) => '\${e.key}: \${e.value.filename}')
-                  .toList();
-
-              log('📦 [FORM DATA FIELDS]: \$fields');
-              log('📂 [FORM DATA FILES]: \$files');
-            } else {
-              log('📦 [BODY]: \${options.data}');
-            }
-          }
-          if (options.queryParameters.isNotEmpty) {
-            log('❓ [QUERY PARAMS]: \${options.queryParameters}');
-          }
+          PrettyLogger.request(
+            method: options.method,
+            uri: options.uri,
+            token: token,
+            headers: options.headers,
+            queryParams: options.queryParameters,
+            data: options.data,
+          );
 
           return handler.next(options);
         },
         onResponse: (response, handler) {
-          log(
-            '✅ [RESPONSE] [\${response.statusCode}] FROM: \${response.requestOptions.path}',
+          PrettyLogger.response(
+            statusCode: response.statusCode,
+            path: response.requestOptions.path,
+            data: response.data,
           );
-          log('📄 [DATA]: \${response.data}');
 
           // Show global success snackbar if a valid string 'message' is present
           if (response.data is Map && response.data['message'] != null) {
@@ -449,13 +442,13 @@ class DioClient implements ApiConsumer {
           return handler.next(response);
         },
         onError: (DioException e, handler) {
-          log('❌ [ERROR] [\${e.response?.statusCode ?? 'NO STATUS'}]');
-          log('🔗 PATH: \${e.requestOptions.path}');
-          log('⚠️ TYPE: \${e.type}');
-          log('💬 MESSAGE: \${e.message}');
-          if (e.response?.data != null) {
-            log('📥 ERROR DATA: \${e.response?.data}');
-          }
+          PrettyLogger.error(
+            statusCode: e.response?.statusCode,
+            path: e.requestOptions.path,
+            type: e.type.name,
+            message: e.message ?? '',
+            errorData: e.response?.data,
+          );
 
           final context = __pascal__App.navigatorKey.currentContext;
           if (context != null) {
@@ -490,11 +483,6 @@ class DioClient implements ApiConsumer {
 
             if (context != null) {
               final String location = context.currentRouteName.toString();
-              final authRoutes = [
-                AppRoutes.login,
-                AppRoutes.home, // wait, should authRoutes contain home? Normally not, let's keep it general
-              ];
-
               if (location != AppRoutes.login) {
                 log('🚀 Redirecting to Login from \$location');
                 context.go(AppRoutes.login);
@@ -522,9 +510,17 @@ class DioClient implements ApiConsumer {
   }
 
   @override
-  Future<dynamic> post(String path, {dynamic data}) async {
+  Future<dynamic> post(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
-      final response = await dio.post(path, data: data);
+      final response = await dio.post(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+      );
       return response.data;
     } on DioException catch (e) {
       _handleDioError(e);
@@ -532,9 +528,17 @@ class DioClient implements ApiConsumer {
   }
 
   @override
-  Future<dynamic> put(String path, {dynamic data}) async {
+  Future<dynamic> put(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
-      final response = await dio.put(path, data: data);
+      final response = await dio.put(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+      );
       return response.data;
     } on DioException catch (e) {
       _handleDioError(e);
@@ -542,9 +546,17 @@ class DioClient implements ApiConsumer {
   }
 
   @override
-  Future<dynamic> delete(String path, {dynamic data}) async {
+  Future<dynamic> delete(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
-      final response = await dio.delete(path, data: data);
+      final response = await dio.delete(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+      );
       return response.data;
     } on DioException catch (e) {
       _handleDioError(e);
@@ -552,9 +564,17 @@ class DioClient implements ApiConsumer {
   }
 
   @override
-  Future<dynamic> patch(String path, {dynamic data}) async {
+  Future<dynamic> patch(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
-      final response = await dio.patch(path, data: data);
+      final response = await dio.patch(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+      );
       return response.data;
     } on DioException catch (e) {
       _handleDioError(e);
@@ -1497,6 +1517,151 @@ class FlutterSecureStorageHelper {
 
   static Future<void> deleteToken() async {
     await _storage.delete(key: AppConstants.authTokenKey);
+  }
+}
+''',
+
+  'lib/core/utils/pretty_logger.dart': r'''
+import 'dart:convert';
+import 'dart:developer';
+
+import 'package:dio/dio.dart';
+
+class PrettyLogger {
+  // ANSI Escape Codes for console coloring
+  static const String _reset = '\x1B[0m';
+  static const String _cyan = '\x1B[36m';
+  static const String _green = '\x1B[32m';
+  static const String _red = '\x1B[31m';
+
+  static void request({
+    required String method,
+    required Uri uri,
+    String? token,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? queryParams,
+    dynamic data,
+  }) {
+    final buffer = StringBuffer()
+      ..writeln(
+        '\n$_cyan┌─────── 🚀 HTTP REQUEST ──────────────────────────────────────────────┐$_reset',
+      )
+      ..writeln('$_cyan│$_reset $method: $uri')
+      ..writeln(
+        '$_cyan├──────────────────────────────────────────────────────────────────┤$_reset',
+      );
+
+    if (token != null && token.isNotEmpty) {
+      buffer.writeln('$_cyan│$_reset 🔐 Token: $token');
+    }
+
+    if (headers != null && headers.isNotEmpty) {
+      buffer.writeln('$_cyan│$_reset 🔑 Headers:');
+      headers.forEach((k, v) => buffer.writeln('$_cyan│$_reset   • $k: $v'));
+    }
+
+    if (queryParams != null && queryParams.isNotEmpty) {
+      buffer.writeln('$_cyan│$_reset ❓ Query Params:');
+      queryParams.forEach(
+        (k, v) => buffer.writeln('$_cyan│$_reset   • $k: $v'),
+      );
+    }
+
+    if (data != null) {
+      buffer.writeln('$_cyan│$_reset 📦 Body:');
+      _formatBody(data, buffer, _cyan);
+    }
+
+    buffer.write(
+      '$_cyan└──────────────────────────────────────────────────────────────────┘$_reset',
+    );
+    log(buffer.toString());
+  }
+
+  static void response({
+    required int? statusCode,
+    required String path,
+    required dynamic data,
+  }) {
+    final buffer = StringBuffer()
+      ..writeln(
+        '\n$_green┌─────── ✅ HTTP RESPONSE [$statusCode] ─────────────────────────────────┐$_reset',
+      )
+      ..writeln('$_green│$_reset Path: $path')
+      ..writeln(
+        '$_green├──────────────────────────────────────────────────────────────────┤$_reset',
+      );
+
+    if (data != null) {
+      buffer.writeln('$_green│$_reset 📄 Payload:');
+      _formatBody(data, buffer, _green);
+    }
+
+    buffer.write(
+      '$_green└──────────────────────────────────────────────────────────────────┘$_reset',
+    );
+    log(buffer.toString());
+  }
+
+  static void error({
+    required int? statusCode,
+    required String path,
+    required String type,
+    required String message,
+    dynamic errorData,
+  }) {
+    final buffer = StringBuffer()
+      ..writeln(
+        '\n$_red┌─────── ❌ HTTP ERROR [${statusCode ?? 'NO STATUS'}] ─────────────────────────┐$_reset',
+      )
+      ..writeln('$_red│$_reset Path: $path')
+      ..writeln('$_red│$_reset Type: $type')
+      ..writeln('$_red│$_reset Message: $message')
+      ..writeln(
+        '$_red├──────────────────────────────────────────────────────────────────┤$_reset',
+      );
+
+    if (errorData != null) {
+      buffer.writeln('$_red│$_reset 📥 Error Payload:');
+      _formatBody(errorData, buffer, _red);
+    }
+
+    buffer.write(
+      '$_red└──────────────────────────────────────────────────────────────────┘$_reset',
+    );
+    log(buffer.toString());
+  }
+
+  static void _formatBody(
+    dynamic data,
+    StringBuffer buffer,
+    String borderColors,
+  ) {
+    if (data is FormData) {
+      for (final field in data.fields) {
+        buffer.writeln(
+          '$borderColors│$_reset   • [Field] ${field.key}: ${field.value}',
+        );
+      }
+      for (final file in data.files) {
+        buffer.writeln(
+          '$borderColors│$_reset   • [File] ${file.key}: ${file.value.filename}',
+        );
+      }
+    } else if (data is Map || data is List) {
+      try {
+        // Formats your JSON structures cleanly with a 2-space indentation style
+        const encoder = JsonEncoder.withIndent('  ');
+        final prettyJson = encoder.convert(data);
+        for (final line in prettyJson.split('\n')) {
+          buffer.writeln('$borderColors│$_reset   $line');
+        }
+      } catch (_) {
+        buffer.writeln('$borderColors│$_reset   $data');
+      }
+    } else {
+      buffer.writeln('$borderColors│$_reset   $data');
+    }
   }
 }
 ''',
